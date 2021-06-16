@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import './index.less';
+const shared = require('./shared');
 
 const ws = new WebSocket('ws://localhost:9001');
 
@@ -28,7 +29,12 @@ $(document).ready(() => {
     })
 
     ws.onopen = () => {
-        ws.send('ready');
+        const uuid = Math.floor(Math.random() * 10000000000000001);
+
+        ws.send(JSON.stringify({
+            type: shared.MSG_TYPE.JOIN,
+            playerId: uuid,
+        }));
     };
 
     ws.onmessage = function (msg) {
@@ -37,7 +43,9 @@ $(document).ready(() => {
 });
 
 $('#btn-new-game').on('click', () => {
-    ws.send('A new game has begun!')
+    ws.send(JSON.stringify({
+        type: shared.MSG_TYPE.START,
+    }));
 })
 
 function setupWalls(numPlayers) {
