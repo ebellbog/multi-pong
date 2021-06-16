@@ -7,6 +7,12 @@ const padding = 5;
 
 $(document).ready(() => {
     setupGame(8);
+
+    // Test websockets
+    const ws = new WebSocket('ws://localhost:9001');
+    ws.onopen = () => {
+        ws.send('ready');
+    };
 });
 
 function setupGame(numPlayers) {
