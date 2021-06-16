@@ -22,9 +22,6 @@ $(document).ready(() => {
     const numPlayers = 8;
     setupWalls(numPlayers);
     setupPaddles(numPlayers);
-    setupBall();
-
-    startAnimating();
 
     $(document).on('keydown', ({ which }) => {
         switch (which) {
@@ -53,10 +50,15 @@ $(document).ready(() => {
     };
 });
 
-$('#btn-new-game').on('click', () => {
+$('#btn-new-game').on('click', (e) => {
+    setupBall();
+    startAnimating();
+
     ws.send(JSON.stringify({
         type: shared.MSG_TYPE.START,
     }));
+
+    $(e.target).hide();
 })
 
 // Setup methods
