@@ -14,6 +14,13 @@ const gameState = {
     isStarted: false,
 };
 
+const notifyPlayers = () => {
+    sendToAllClients(JSON.stringify({
+        type: shared.MSG_TYPE.JOINED,
+        numPlayers: Object.keys(gameState.players).length
+    }));
+}
+
 server.on('connection', function(socket) {
     socket.on('message', (msg) => {
         msg = JSON.parse(msg);
@@ -26,7 +33,7 @@ server.on('connection', function(socket) {
             gameState.players[playerId] = {
                 socket,
             };
-            sendToAllClients(shared.MSG_TYPE.JOINED);
+            notifyPlayers();
         }
 
         if (msg.type === shared.MSG_TYPE.START) {
@@ -45,7 +52,7 @@ server.on('connection', function(socket) {
     socket.on('close', () => {
         console.log('socket closing');
         let closingPlayerId = null;
-        for (const playerId in gameState.players) {
+        for (let playerId in gameState.players) {
             if (gameState.players[playerId].socket === socket) {
                 closingPlayerId = playerId;
                 console.log('found closing player' + closingPlayerId);
@@ -53,6 +60,7 @@ server.on('connection', function(socket) {
         }
         if (closingPlayerId) {
             delete gameState.players[closingPlayerId];
+            notifyPlayers();
         }
     });
 

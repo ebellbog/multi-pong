@@ -21,9 +21,6 @@ let lastBounce;
 
 $(document).ready(() => {
     ws = new WebSocket('ws://localhost:9001');
-    const numPlayers = 8;
-    setupWalls(numPlayers);
-    setupPaddles(numPlayers);
 
     $(document).on('keydown', ({ which }) => {
         switch (which) {
@@ -55,6 +52,12 @@ $(document).ready(() => {
             startAnimating();
             $newGame.hide();
         }
+        if (msg.type === shared.MSG_TYPE.JOINED) {
+            $game.empty();
+            paddleLength = null;
+            setupWalls(Math.max(msg.numPlayers, 3));
+            setupPaddles(msg.numPlayers);
+        }
     };
 });
 
@@ -73,7 +76,7 @@ function setupWalls(numPlayers) {
     const angleDelta = (Math.PI * 2) / numPlayers;
     for (let i = 0; i < numPlayers; i++) {
         const startAngle = angleDelta * i;
-        const endAngle = angleDelta * (i+ 1);
+        const endAngle = angleDelta * (i + 1);
 
         const startPt = projectAngle(centerPt, radius, startAngle);
         const endPt = projectAngle(centerPt, radius, endAngle);
@@ -117,7 +120,7 @@ function setupBall(angle) {
 
     const $ball = drawCircle(x, y, ballSize).addClass('ball');
 
-    ball = {x, y, angle, $ball};
+    ball = { x, y, angle, $ball };
 }
 
 
@@ -185,11 +188,11 @@ function drawLine({ x: x1, y: y1 }, { x: x2, y: y2 }) {
 
 function drawCircle(cx, cy, r) {
     return $(createSvg('circle'))
-        .attr({cx, cy, r})
+        .attr({ cx, cy, r })
         .appendTo($game);
 }
 function updateCircle($circle, cx, cy) {
-    $circle.attr({cx, cy});
+    $circle.attr({ cx, cy });
 }
 
 // Math utility methods
@@ -210,8 +213,8 @@ function projectSlope(start, dist, slope) {
 }
 
 function interpolatePoint($line, percent) {
-    const startPt = {x: parseInt($line.attr('x1')), y: parseInt($line.attr('y1'))};
-    const endPt = {x: parseInt($line.attr('x2')), y: parseInt($line.attr('y2'))};
+    const startPt = { x: parseInt($line.attr('x1')), y: parseInt($line.attr('y1')) };
+    const endPt = { x: parseInt($line.attr('x2')), y: parseInt($line.attr('y2')) };
     const deltaY = endPt.y - startPt.y;
     const deltaX = endPt.x - startPt.x;
     return {
@@ -253,8 +256,8 @@ function distToLine(l1, l2, p) {
     const cX = (b2 - b1) / (m1 - m2);
     const cY = m1 * cX + b1;
 
-    let closest = {x: cX, y: cY};
-    if (getDist(l1 , closest) > getDist(l1, l2)) closest = l2;
+    let closest = { x: cX, y: cY };
+    if (getDist(l1, closest) > getDist(l1, l2)) closest = l2;
     else if (getDist(l2, closest) > getDist(l1, l2)) closest = l1;
 
     return getDist(closest, p);
