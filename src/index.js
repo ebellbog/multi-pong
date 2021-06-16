@@ -2,7 +2,7 @@ import _ from 'lodash';
 import './index.less';
 const shared = require('./shared');
 
-const ws = new WebSocket('ws://localhost:9001');
+let ws;
 
 const $newGame = $('#btn-new-game');
 const $game = $('#game');
@@ -20,6 +20,7 @@ let ball;
 let lastBounce;
 
 $(document).ready(() => {
+    ws = new WebSocket('ws://localhost:9001');
     const numPlayers = 8;
     setupWalls(numPlayers);
     setupPaddles(numPlayers);
@@ -55,7 +56,7 @@ $(document).ready(() => {
     };
 });
 
-$newGame.on('click', (e) => {
+$newGame.on('click', () => {
     ws.send(JSON.stringify({
         type: shared.MSG_TYPE.START,
     }));
