@@ -1,6 +1,11 @@
+:root {
+    --bg: #222;
+    --color: rgb(128, 0, 255);
+    --font: Montserrat, Roboto, Helvetica, Arial, sans-serif;
+}
 
 body {
-    background-color: #222;
+    background-color: var(--bg);
     margin: 0;
     padding: 0;
 }
@@ -35,18 +40,63 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+}
 
-    padding: 8px 24px;
+.button-wrapper {
+    filter: url('#goo');
+}
 
+.button {
+    display: inline-block;
+    text-align: center;
+    background: var(--color);
+    color: var(--bg);
+    padding: 20px 25px;
+    border-radius: 80px;
+    line-height: 1;
+
+    font-weight: bold;
     font-size: 26px;
     font-family: sans-serif;
+    
+    position: relative;
+    min-width: 8.23em;
+    text-decoration: none;
+    font-family: var(--font);
+    font-size: 1.25rem;
+    transition: all 1s;
 
-    border: 2px solid white;
-    border-radius: 80px;
-
-    color: white;
-    background-color: transparent;
     &:hover {
-        background-color: fade(white, 20%);
+        color: white;
+        transform: scaleX(1.1);
     }
+}
+
+.button:before,
+.button:after {
+    width: 4.4em;
+    height: 2.95em;
+    position: absolute;
+    content: "";
+    display: inline-block;
+    background: var(--color);
+    border-radius: 50%;
+    transition: transform 1s ease;
+    transform: scale(0);
+    z-index: -1;
+}
+
+.button:before {
+    top: -25%;
+    left: 20%;
+}
+
+.button:after {
+    bottom: -25%;
+    right: 20%;
+}
+
+.button:hover:before,
+.button:hover:after {
+    transform: none;
 }
