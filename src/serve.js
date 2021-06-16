@@ -35,6 +35,8 @@ server.on('connection', function(socket) {
         }
     });
 
+    // When a player leaves, remove them if game has not started.
+    // TODO: If game has started?
     socket.on('close', () => {
         console.log('socket closing');
         let closingPlayerId = null;

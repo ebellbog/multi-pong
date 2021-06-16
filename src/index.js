@@ -4,6 +4,7 @@ const shared = require('./shared');
 
 const ws = new WebSocket('ws://localhost:9001');
 
+const $newGame = $('#btn-new-game');
 const $game = $('#game');
 const gameSize = 500;
 const padding = 5;
@@ -46,19 +47,18 @@ $(document).ready(() => {
     };
 
     ws.onmessage = function (msg) {
-        console.log(msg.data);
+        if (msg.data === shared.MSG_TYPE.STARTED) {
+            setupBall();
+            startAnimating();
+            $newGame.hide();
+        }
     };
 });
 
-$('#btn-new-game').on('click', (e) => {
-    setupBall();
-    startAnimating();
-
+$newGame.on('click', (e) => {
     ws.send(JSON.stringify({
         type: shared.MSG_TYPE.START,
     }));
-
-    $(e.target).hide();
 })
 
 // Setup methods
