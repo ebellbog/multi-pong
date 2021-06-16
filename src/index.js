@@ -18,6 +18,7 @@ let paddleLength, paddlePlacement;
 
 let ball;
 let lastBounce;
+let uuid;
 
 $(document).ready(() => {
     ws = new WebSocket('ws://localhost:9001');
@@ -25,10 +26,18 @@ $(document).ready(() => {
     $(document).on('keydown', ({ which }) => {
         switch (which) {
             case 37:
-                paddlePlacement -= .05;
+                ws.send(JSON.stringify({
+                    type: shared.MSG_TYPE.MOVE,
+                    playerId: uuid,
+                    direction: -1, // -1 = left, 1 = right
+                }));
                 break;
             case 39:
-                paddlePlacement += .05;
+                ws.send(JSON.stringify({
+                    type: shared.MSG_TYPE.MOVE,
+                    playerId: uuid,
+                    direction: 1, // -1 = left, 1 = right
+                }));
                 break;
             default:
                 break;
@@ -36,7 +45,7 @@ $(document).ready(() => {
     })
 
     ws.onopen = () => {
-        const uuid = Math.floor(Math.random() * 10000000000000001);
+        uuid = `${Math.floor(Math.random() * 10000000000000001)}`;
 
         ws.send(JSON.stringify({
             type: shared.MSG_TYPE.JOIN,
@@ -53,10 +62,14 @@ $(document).ready(() => {
             $newGame.hide();
         }
         if (msg.type === shared.MSG_TYPE.JOINED) {
-            $game.empty();
+            $('line').remove();
             paddleLength = null;
-            setupWalls(Math.max(msg.numPlayers, 3));
-            setupPaddles(msg.numPlayers);
+            const playerIdx = msg.players.indexOf(uuid);
+            setupWalls(msg.players, playerIdx);
+            setupPaddles(msg.players, playerIdx);
+        }
+        if (msg.type === shared.MSG_TYPE.PADDLEPOSITIONS) {
+            console.log(msg.paddlePositions);
         }
     };
 });
@@ -69,12 +82,13 @@ $newGame.on('click', () => {
 
 // Setup methods
 
-function setupWalls(numPlayers) {
+function setupWalls(players) {
     $game.attr('viewBox', `0 0 ${gameSize} ${gameSize}`);
     const radius = gameSize / 2 - padding;
     const centerPt = { x: gameSize / 2, y: gameSize / 2 };
-    const angleDelta = (Math.PI * 2) / numPlayers;
-    for (let i = 0; i < numPlayers; i++) {
+    const numWalls = Math.max(players.length, 3);
+    const angleDelta = (Math.PI * 2) / numWalls;
+    for (let i = 0; i < numWalls; i++) {
         const startAngle = angleDelta * i;
         const endAngle = angleDelta * (i + 1);
 
@@ -84,8 +98,8 @@ function setupWalls(numPlayers) {
         const $wall = drawLine(startPt, endPt)
             .addClass('wall')
             .attr({
-                stroke: `hsl(${360 * i / numPlayers} , 100%, 50%)`,
-                'data-player-id': i
+                stroke: `hsl(${360 * i / numWalls} , 100%, 50%)`,
+                'data-player-id': (i < players.length - 1) ? players[i] : ''
             });
 
         const wallAngle = (startAngle + endAngle) / 2;
@@ -93,9 +107,10 @@ function setupWalls(numPlayers) {
     }
 }
 
-function setupPaddles() {
+function setupPaddles(players, playerIdx) {
     paddlePlacement = 0.5;
     $('line').each((idx, line) => {
+        if (idx >= players.length) return;
         const $line = $(line);
         const center = getCenter($line);
         const slope = getSlope($line);
@@ -105,7 +120,7 @@ function setupPaddles() {
         const startPt = projectSlope(center, -paddleLength / 2, slope);
         const endPt = projectSlope(center, paddleLength / 2, slope);
         const $paddle = drawLine(startPt, endPt)
-            .addClass('paddle')
+            .addClass(`paddle${idx === playerIdx ? ' active-player' : ''}`)
             .attr({
                 stroke: $line.attr('stroke'),
                 'data-player-id': $line.attr('data-player-id')

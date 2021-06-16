@@ -1,6 +1,7 @@
 {
   "scripts": {
     "start": "webpack serve --mode=development",
+    "serve": "yarn nodemon ./src/serve.js",
     "build": "./node_modules/.bin/webpack --mode=production"
   },
   "devDependencies": {
