@@ -8,6 +8,8 @@ const $game = $('#game');
 const gameSize = 500;
 const padding = 5;
 
+const ballSize = 8;
+
 const speed = 200;
 
 const $paddles = [], walls = [];
@@ -109,7 +111,7 @@ function setupBall() {
     const y = gameSize / 2;
     const angle = randFloat(0, Math.PI * 2);
 
-    const $ball = drawCircle(x, y, 8).addClass('ball');
+    const $ball = drawCircle(x, y, ballSize).addClass('ball');
 
     ball = {x, y, angle, $ball};
 }
@@ -150,7 +152,7 @@ function startAnimating() {
 }
 
 function detectCollisions() {
-    const minDist = 5;
+    const minDist = ballSize * 1.25;
     lastBounce = lastBounce || Date.now();
 
     if (Date.now() - lastBounce < 100) return false;
@@ -258,4 +260,3 @@ function distToLine(l1, l2, p) {
 function randFloat(min, max) {
     return Math.random() * (max - min) + min;
 }
-
