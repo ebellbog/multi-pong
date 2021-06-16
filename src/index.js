@@ -48,8 +48,10 @@ $(document).ready(() => {
     };
 
     ws.onmessage = function (msg) {
-        if (msg.data === shared.MSG_TYPE.STARTED) {
-            setupBall();
+        msg = JSON.parse(msg.data);
+        if (msg.type === shared.MSG_TYPE.STARTED) {
+            const angle = +msg.ball.angle;
+            setupBall(angle);
             startAnimating();
             $newGame.hide();
         }
@@ -109,10 +111,9 @@ function setupPaddles() {
     });
 }
 
-function setupBall() {
+function setupBall(angle) {
     const x = gameSize / 2;
     const y = gameSize / 2;
-    const angle = randFloat(0, Math.PI * 2);
 
     const $ball = drawCircle(x, y, ballSize).addClass('ball');
 
@@ -137,21 +138,20 @@ function updateBall(dt) {
 
 function startAnimating() {
     let lastUpdate = Date.now();
-    const _animate = () => {
-        window.requestAnimationFrame(() => {
-            const time = Date.now();
+    setInterval(() => {
+        const time = Date.now();
 
-            updateBall((time - lastUpdate)/1000);
+        const timeDelta = (time - lastUpdate) / 1000;
+        if (timeDelta < 1) {
+            updateBall(timeDelta);
             const newAngle = detectCollisions();
             if (newAngle !== false) {
                 ball.angle = newAngle;
             }
+        }
+        lastUpdate = time;
 
-            lastUpdate = time;
-            _animate();
-        });
-    }
-    _animate();
+    }, 30);
 }
 
 function detectCollisions() {

@@ -31,7 +31,12 @@ server.on('connection', function(socket) {
 
         if (msg.type === shared.MSG_TYPE.START) {
             gameState.isStarted = true;
-            sendToAllClients(shared.MSG_TYPE.STARTED);
+            sendToAllClients(JSON.stringify({
+                type:shared.MSG_TYPE.STARTED,
+                ball: {
+                    angle: Math.random() * Math.PI * 2,
+                },
+            }));
         }
     });
 
