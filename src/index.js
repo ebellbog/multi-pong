@@ -3,10 +3,6 @@ import './index.less';
 
 const ws = new WebSocket('ws://localhost:9001');
 
-$(document).ready(() => {
-    console.log('ready to go!');
-
-
 const $game = $('#game');
 const gameSize = 500;
 const padding = 5;
@@ -18,8 +14,8 @@ $(document).ready(() => {
     setupWalls(8);
     setupPaddles(8);
 
-    $(document).on('keydown', ({which}) => {
-        switch(which) {
+    $(document).on('keydown', ({ which }) => {
+        switch (which) {
             case 37:
                 console.log('left arrow');
                 break;
@@ -47,7 +43,7 @@ $('#btn-new-game').on('click', () => {
 function setupWalls(numPlayers) {
     $game.attr('viewBox', `0 0 ${gameSize} ${gameSize}`);
     const radius = gameSize / 2 - padding;
-    const centerPt = {x: gameSize / 2, y: gameSize / 2};
+    const centerPt = { x: gameSize / 2, y: gameSize / 2 };
     const angleDelta = (Math.PI * 2) / numPlayers;
     for (let i = 0; i < numPlayers; i++) {
         const startPt = projectAngle(centerPt, radius, angleDelta * i);
@@ -64,8 +60,8 @@ function setupPaddles() {
         if (!paddleLength) {
             paddleLength = getLength($line) * 0.3;
         }
-        const startPt = projectSlope(center, -paddleLength/2, slope);
-        const endPt = projectSlope(center, paddleLength/2, slope);
+        const startPt = projectSlope(center, -paddleLength / 2, slope);
+        const endPt = projectSlope(center, paddleLength / 2, slope);
         const $paddle = drawLine(startPt, endPt).addClass('paddle').attr('stroke', $line.attr('stroke'));
         $paddles.push($paddle);
     });
@@ -78,9 +74,9 @@ function createSvg(element) {
     return document.createElementNS('http://www.w3.org/2000/svg', element);
 }
 
-function drawLine({x: x1, y: y1}, {x: x2, y: y2}) {
+function drawLine({ x: x1, y: y1 }, { x: x2, y: y2 }) {
     return $(createSvg('line'))
-        .attr({x1, y1, x2, y2})
+        .attr({ x1, y1, x2, y2 })
         .appendTo($game);
 }
 
