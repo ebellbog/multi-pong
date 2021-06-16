@@ -5,14 +5,8 @@ const server = new WebSocket.Server({
 });
 
 const gameState = {
-    players: [
-        // playerId: {
-        //     socket: socket,
-        //     paddlePosition: 0.1,
-        //     paddleColor: '00aabb',
-        //     isActive: false,
-        // },
-    ],
+    // Map of playerId -> {socket}
+    players: {},
     ball: {
         position: [0, 0],
         direction: 1,
@@ -21,10 +15,7 @@ const gameState = {
 };
 
 server.on('connection', function(socket) {
-    console.log('connected');
-
-    socket.on('message', function(msg) {
-        console.log(msg);
+    socket.on('message', (msg) => {
         msg = JSON.parse(msg);
 
         if (msg.type === shared.MSG_TYPE.JOIN) {
@@ -32,16 +23,29 @@ server.on('connection', function(socket) {
                 return; // Send message back? Queue for next game?
             }
             const playerId = msg.playerId;
-            gameState.players.push({
-                playerId,
+            gameState.players[playerId] = {
                 socket,
-            });
+            };
             sendToAllClients(shared.MSG_TYPE.JOINED);
         }
 
         if (msg.type === shared.MSG_TYPE.START) {
-            gameState.isStarted = True;
+            gameState.isStarted = true;
             sendToAllClients(shared.MSG_TYPE.STARTED);
+        }
+    });
+
+    socket.on('close', () => {
+        console.log('socket closing');
+        let closingPlayerId = null;
+        for (const playerId in gameState.players) {
+            if (gameState.players[playerId].socket === socket) {
+                closingPlayerId = playerId;
+                console.log('found closing player' + closingPlayerId);
+            }
+        }
+        if (closingPlayerId) {
+            delete gameState.players[closingPlayerId];
         }
     });
 
@@ -49,9 +53,11 @@ server.on('connection', function(socket) {
 });
 
 const sendToAllClients = (msg) => {
-    gameState.players.forEach((player) => {
-        player.socket.send(msg);
-    });
+    console.log(gameState);
+    for (const playerId in gameState.players) {
+        console.log(`sending msg "${msg}" to player with id ${playerId}`);
+        gameState.players[playerId].socket.send(msg);
+    }
 };
 
 const startGame = () => {
@@ -66,7 +72,7 @@ const startGame = () => {
 const gameLoop = () => {
     console.log('game loop');
     updateBallPosition(gameState);
-    sendOutPositions();
+    // sendOutPositions();
     setTimeout(gameLoop, 100);
 };
 
