@@ -12,9 +12,9 @@ const padding = 5;
 
 const ballSize = 8;
 
-const speed = 200;
+const speed = 175;
 
-const walls = [];
+const $walls = [];
 let $paddles = [];
 let paddleLength;
 
@@ -23,6 +23,7 @@ let lastBounce;
 let uuid;
 
 let gameInterval = null;
+let didLose = false;
 
 $(document).ready(() => {
     ws = new WebSocket('ws://localhost:9001');
@@ -91,6 +92,7 @@ $newGame.on('click', () => {
 })
 
 function startGame(angle) {
+    didLose = false;
     setupBall(angle);
     startAnimating();
     $newGameContainer.hide();
@@ -121,34 +123,32 @@ function setupWalls(players) {
         const startPt = projectAngle(centerPt, radius, startAngle);
         const endPt = projectAngle(centerPt, radius, endAngle);
 
+        const wallAngle = (startAngle + endAngle) / 2;
         const $wall = drawLine(startPt, endPt)
             .addClass('wall')
             .attr({
                 stroke: `hsl(${360 * i / numWalls} , 100%, 50%)`,
-                'data-player-id': (i < players.length) ? players[i] : ''
+                'data-angle': wallAngle,
+                'data-player-id': (i < players.length) ? players[i] : '',
             });
-
-        const wallAngle = (startAngle + endAngle) / 2;
-        walls.push([startPt, endPt, wallAngle]);
+        $walls.push($wall);
     }
 }
 
 function setupPaddles(players) {
     $paddles = [];
-    $('.wall').each((idx, line) => {
-        const $line = $(line);
-
+    $walls.forEach(($wall) => {
         // Only add paddles to walls associated with actual players
-        const playerId = $line.attr('data-player-id');
+        const playerId = $wall.attr('data-player-id');
         if (!playerId) {
             return;
         }
 
         const paddlePosition = players[playerId];
-        const center = interpolatePoint($line, paddlePosition);
-        const slope = getSlope($line);
+        const center = interpolatePoint($wall, paddlePosition);
+        const slope = getSlope($wall);
         if (!paddleLength) {
-            paddleLength = getLength($line) * 0.3;
+            paddleLength = getLength($wall) * 0.3;
         }
 
         const startPt = projectSlope(center, -paddleLength / 2, slope);
@@ -157,7 +157,8 @@ function setupPaddles(players) {
         const $paddle = drawLine(startPt, endPt)
             .addClass(`paddle${playerId === uuid ? ' active-player' : ''}`)
             .attr({
-                stroke: $line.attr('stroke'),
+                stroke: $wall.attr('stroke'),
+                'data-angle': $wall.attr('data-angle'),
                 'data-player-id': playerId,
             });
         $paddles.push($paddle);
@@ -196,6 +197,15 @@ function updateBall(dt) {
     ball.x += Math.cos(ball.angle) * speed * dt;
     ball.y += Math.sin(ball.angle) * speed * dt;
     updateCircle(ball.$ball, ball.x, ball.y);
+
+    if (ball.x > gameSize || ball.x < 0 ||
+        ball.y > gameSize || ball.y < 0) {
+            alert(`Game over - you ${didLose ? 'lost :(' : 'won!'}`);
+            ws.send(JSON.stringify({
+                type: shared.MSG_TYPE.END,
+            }));
+            endGame();
+    }
 }
 
 
@@ -224,15 +234,35 @@ function detectCollisions() {
     // Prevent multiple bounces per collision by adding a delay
     if (Date.now() - lastBounce < 100) return false;
 
-    for (let i = 0; i < walls.length; i++) {
-        const wall = walls[i];
-        const doesCollide = distToLine(wall[0], wall[1], ball) < minDist;
+    const transformCoords = ($line) => [
+        {x: $line.attr('x1'), y: $line.attr('y1')},
+        {x: $line.attr('x2'), y: $line.attr('y2')},
+    ];
+
+    for (let i = 0; i < $walls.length; i++) {
+        const $wall = $walls[i];
+        const doesCollide = distToLine(...transformCoords($wall), ball) < minDist;
         if (doesCollide) {
-            lastBounce = Date.now();
-            const wallAngle = wall[2];
-            return (Math.PI + 2 * wallAngle - ball.angle) % (Math.PI * 2);
+            const playerId = $wall.attr('data-player-id');
+            const _bounce = () => {
+                lastBounce = Date.now();
+                const wallAngle = $wall.attr('data-angle');
+                return (Math.PI + 2 * wallAngle - ball.angle) % (Math.PI * 2);
+            }
+            if (!playerId) {
+                return _bounce();
+            } else {
+                const $paddle = $paddles.find(($paddle) => $paddle.attr('data-player-id') === playerId);
+                const hitsPaddle = distToLine(...transformCoords($paddle), ball) < minDist;
+                if (hitsPaddle) {
+                    return _bounce();
+                }
+                didLose = playerId === uuid;
+                return false;
+            }
         }
     }
+
     return false;
 }
 

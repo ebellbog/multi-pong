@@ -57,6 +57,10 @@ server.on('connection', function (socket) {
             }));
         }
 
+        if (msg.type === shared.MSG_TYPE.END) {
+            gameState.isStarted = false;
+        }
+
         if (msg.type === shared.MSG_TYPE.MOVE) {
             const { playerId, direction } = msg;
             const playerData = gameState.players[playerId];
