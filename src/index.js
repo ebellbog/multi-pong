@@ -4,6 +4,7 @@ const shared = require('./shared');
 
 let ws;
 
+const $newGameContainer = $('#new-game-container');
 const $newGame = $('#btn-new-game');
 const $game = $('#game');
 const gameSize = 500;
@@ -61,7 +62,7 @@ $(document).ready(() => {
             const angle = +msg.ball.angle;
             setupBall(angle);
             startAnimating();
-            $newGame.hide();
+            $newGameContainer.hide();
         }
         if (msg.type === shared.MSG_TYPE.JOINED) {
             $('line').remove();
