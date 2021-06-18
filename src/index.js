@@ -14,8 +14,7 @@ const ballSize = 8;
 
 const speed = 175;
 
-const $walls = [];
-let $paddles = [];
+let $walls = [], $paddles = [];
 let paddleLength;
 
 let ball;
@@ -72,7 +71,7 @@ $(document).ready(() => {
                 endGame();
             }
 
-            $('line').remove();
+            $('.wall, .paddle').remove();
             paddleLength = null;
 
             const {players} = msg;
@@ -115,6 +114,8 @@ function setupWalls(players) {
     const centerPt = { x: gameSize / 2, y: gameSize / 2 };
     const numWalls = Math.max(players.length, 3);
     const angleDelta = (Math.PI * 2) / numWalls;
+
+    $walls = [];
 
     for (let i = 0; i < numWalls; i++) {
         const startAngle = angleDelta * i;
