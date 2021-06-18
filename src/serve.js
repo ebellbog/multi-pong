@@ -74,6 +74,7 @@ server.on('connection', function (socket) {
         }
         if (closingPlayerId) {
             delete gameState.players[closingPlayerId];
+            gameState.isStarted = false; // Game should end if a player leaves
             notifyPlayers();
         }
     });

@@ -21,6 +21,8 @@ let ball;
 let lastBounce;
 let uuid;
 
+let gameInterval = null;
+
 $(document).ready(() => {
     ws = new WebSocket('ws://localhost:9001');
 
@@ -59,14 +61,17 @@ $(document).ready(() => {
     ws.onmessage = function (msg) {
         msg = JSON.parse(msg.data);
         if (msg.type === shared.MSG_TYPE.STARTED) {
-            const angle = +msg.ball.angle;
-            setupBall(angle);
-            startAnimating();
-            $newGameContainer.hide();
+            startGame(+msg.ball.angle);
         }
         if (msg.type === shared.MSG_TYPE.JOINED) {
+            if (gameInterval) {
+                // If player leaves when game already in session, end game
+                endGame();
+            }
+
             $('line').remove();
             paddleLength = null;
+
             const playerIdx = msg.players.indexOf(uuid);
             setupWalls(msg.players, playerIdx);
             setupPaddles(msg.players, playerIdx);
@@ -82,6 +87,20 @@ $newGame.on('click', () => {
         type: shared.MSG_TYPE.START,
     }));
 })
+
+function startGame(angle) {
+    setupBall(angle);
+    startAnimating();
+    $newGameContainer.hide();
+}
+
+function endGame() {
+    clearInterval(gameInterval);
+    gameInterval = null;
+
+    $('.ball').remove();
+    $newGameContainer.show();
+}
 
 // Setup methods
 
@@ -159,7 +178,7 @@ function updateBall(dt) {
 
 function startAnimating() {
     let lastUpdate = Date.now();
-    setInterval(() => {
+    gameInterval = setInterval(() => {
         const time = Date.now();
 
         const timeDelta = (time - lastUpdate) / 1000;
@@ -179,6 +198,7 @@ function detectCollisions() {
     const minDist = ballSize * 1.25;
     lastBounce = lastBounce || Date.now();
 
+    // Prevent multiple bounces per collision by adding a delay
     if (Date.now() - lastBounce < 100) return false;
 
     for (let i = 0; i < walls.length; i++) {
@@ -217,16 +237,24 @@ function updateCircle($circle, cx, cy) {
 
 function projectAngle(start, dist, angle) {
     return {
-        x: start.x + Math.cos(angle) * dist,
-        y: start.y + Math.sin(angle) * dist
+        x: _.round(start.x + Math.cos(angle) * dist, 2),
+        y: _.round(start.y + Math.sin(angle) * dist, 2)
     }
 }
 
 function projectSlope(start, dist, slope) {
+    if (slope === false) {
+        // Handle vertical slope
+        return {
+            x: start.x,
+            y: start.y + dist
+        };
+    }
+
     const deltaX = Math.sqrt(Math.pow(dist, 2) / (Math.pow(slope, 2) + 1)) * (dist > 0 ? 1 : -1);
     return {
-        x: start.x + deltaX,
-        y: start.y + deltaX * slope
+        x: _.round(start.x + deltaX, 2),
+        y: _.round(start.y + deltaX * slope, 2)
     }
 }
 
@@ -236,8 +264,8 @@ function interpolatePoint($line, percent) {
     const deltaY = endPt.y - startPt.y;
     const deltaX = endPt.x - startPt.x;
     return {
-        x: startPt.x + deltaX * percent,
-        y: startPt.y + deltaY * percent
+        x: _.round(startPt.x + deltaX * percent, 2),
+        y: _.round(startPt.y + deltaY * percent, 2)
     }
 }
 
@@ -265,14 +293,21 @@ function getDist(p1, p2) {
     return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 }
 function distToLine(l1, l2, p) {
-    const m1 = (l2.y - l1.y) / (l2.x - l1.x);
-    const b1 = l1.y - l1.x * m1;
+    let cX, cY;
+    if (l2.x === l1.x) {
+         // Handle vertical lines
+        cX = l1.x;
+        cY = p.y;
+    } else {
+        const m1 = (l2.y - l1.y) / (l2.x - l1.x);
+        const b1 = l1.y - l1.x * m1;
 
-    const m2 = -1 / m1;
-    const b2 = p.y - p.x * m2;
+        const m2 = -1 / m1;
+        const b2 = p.y - p.x * m2;
 
-    const cX = (b2 - b1) / (m1 - m2);
-    const cY = m1 * cX + b1;
+        cX = (b2 - b1) / (m1 - m2);
+        cY = m1 * cX + b1;
+    }
 
     let closest = { x: cX, y: cY };
     if (getDist(l1, closest) > getDist(l1, l2)) closest = l2;
