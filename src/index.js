@@ -12,17 +12,21 @@ const padding = 5;
 
 const ballSize = 8;
 
-const speed = 200;
+const speed = 175;
 
-const $paddles = [], walls = [];
-let paddleLength, paddlePlacement;
+let $walls = [], $paddles = [];
+let paddleLength;
 
 let ball;
 let lastBounce;
 let uuid;
 
+let gameInterval = null;
+let didLose = false;
+
 $(document).ready(() => {
     ws = new WebSocket('ws://localhost:9001');
+    $game.attr('viewBox', `0 0 ${gameSize} ${gameSize}`);
 
     $(document).on('keydown', ({ which }) => {
         switch (which) {
@@ -30,14 +34,14 @@ $(document).ready(() => {
                 ws.send(JSON.stringify({
                     type: shared.MSG_TYPE.MOVE,
                     playerId: uuid,
-                    direction: -1, // -1 = left, 1 = right
+                    direction: 1, // 1 = left, -1 = right
                 }));
                 break;
             case 39:
                 ws.send(JSON.stringify({
                     type: shared.MSG_TYPE.MOVE,
                     playerId: uuid,
-                    direction: 1, // -1 = left, 1 = right
+                    direction: -1, // 1 = left, -1 = right
                 }));
                 break;
             default:
@@ -59,20 +63,23 @@ $(document).ready(() => {
     ws.onmessage = function (msg) {
         msg = JSON.parse(msg.data);
         if (msg.type === shared.MSG_TYPE.STARTED) {
-            const angle = +msg.ball.angle;
-            setupBall(angle);
-            startAnimating();
-            $newGameContainer.hide();
+            startGame(+msg.ball.angle);
         }
         if (msg.type === shared.MSG_TYPE.JOINED) {
-            $('line').remove();
+            if (gameInterval) {
+                // If player leaves when game already in session, end game
+                endGame();
+            }
+
+            $('.wall, .paddle').remove();
             paddleLength = null;
-            const playerIdx = msg.players.indexOf(uuid);
-            setupWalls(msg.players, playerIdx);
-            setupPaddles(msg.players, playerIdx);
+
+            const {players} = msg;
+            setupWalls(players);
+            setupPaddles(players);
         }
         if (msg.type === shared.MSG_TYPE.PADDLEPOSITIONS) {
-            console.log(msg.paddlePositions);
+            updatePaddles(msg.paddlePositions);
         }
     };
 });
@@ -83,14 +90,33 @@ $newGame.on('click', () => {
     }));
 })
 
+function startGame(angle) {
+    didLose = false;
+    setupBall(angle);
+    startAnimating();
+    $newGameContainer.hide();
+}
+
+function endGame() {
+    clearInterval(gameInterval);
+    gameInterval = null;
+
+    $('.ball').remove();
+    $newGameContainer.show();
+}
+
 // Setup methods
 
 function setupWalls(players) {
-    $game.attr('viewBox', `0 0 ${gameSize} ${gameSize}`);
+    players = Object.keys(players);
+
     const radius = gameSize / 2 - padding;
     const centerPt = { x: gameSize / 2, y: gameSize / 2 };
     const numWalls = Math.max(players.length, 3);
     const angleDelta = (Math.PI * 2) / numWalls;
+
+    $walls = [];
+
     for (let i = 0; i < numWalls; i++) {
         const startAngle = angleDelta * i;
         const endAngle = angleDelta * (i + 1);
@@ -98,35 +124,43 @@ function setupWalls(players) {
         const startPt = projectAngle(centerPt, radius, startAngle);
         const endPt = projectAngle(centerPt, radius, endAngle);
 
+        const wallAngle = (startAngle + endAngle) / 2;
         const $wall = drawLine(startPt, endPt)
             .addClass('wall')
             .attr({
                 stroke: `hsl(${360 * i / numWalls} , 100%, 50%)`,
-                'data-player-id': (i < players.length - 1) ? players[i] : ''
+                'data-angle': wallAngle,
+                'data-player-id': (i < players.length) ? players[i] : '',
             });
-
-        const wallAngle = (startAngle + endAngle) / 2;
-        walls.push([startPt, endPt, wallAngle]);
+        $walls.push($wall);
     }
 }
 
-function setupPaddles(players, playerIdx) {
-    paddlePlacement = 0.5;
-    $('line').each((idx, line) => {
-        if (idx >= players.length) return;
-        const $line = $(line);
-        const center = getCenter($line);
-        const slope = getSlope($line);
-        if (!paddleLength) {
-            paddleLength = getLength($line) * 0.3;
+function setupPaddles(players) {
+    $paddles = [];
+    $walls.forEach(($wall) => {
+        // Only add paddles to walls associated with actual players
+        const playerId = $wall.attr('data-player-id');
+        if (!playerId) {
+            return;
         }
+
+        const paddlePosition = players[playerId];
+        const center = interpolatePoint($wall, paddlePosition);
+        const slope = getSlope($wall);
+        if (!paddleLength) {
+            paddleLength = getLength($wall) * 0.3;
+        }
+
         const startPt = projectSlope(center, -paddleLength / 2, slope);
         const endPt = projectSlope(center, paddleLength / 2, slope);
+
         const $paddle = drawLine(startPt, endPt)
-            .addClass(`paddle${idx === playerIdx ? ' active-player' : ''}`)
+            .addClass(`paddle${playerId === uuid ? ' active-player' : ''}`)
             .attr({
-                stroke: $line.attr('stroke'),
-                'data-player-id': $line.attr('data-player-id')
+                stroke: $wall.attr('stroke'),
+                'data-angle': $wall.attr('data-angle'),
+                'data-player-id': playerId,
             });
         $paddles.push($paddle);
     });
@@ -144,9 +178,19 @@ function setupBall(angle) {
 
 // Animation methods
 
-function updatePaddles() {
+function updatePaddles(paddlePositions) {
     $paddles.forEach(($paddle) => {
+        const playerId = $paddle.attr('data-player-id');
+        const position = paddlePositions[playerId];
 
+        const $wall = $(`.wall[data-player-id="${playerId}"]`);
+        const slope = getSlope($wall);
+
+        const newCenter = interpolatePoint($wall, position);
+        const startPt = projectSlope(newCenter, -paddleLength / 2, slope);
+        const endPt = projectSlope(newCenter, paddleLength / 2, slope);
+
+        updateLine($paddle, startPt, endPt);
     })
 }
 
@@ -154,12 +198,21 @@ function updateBall(dt) {
     ball.x += Math.cos(ball.angle) * speed * dt;
     ball.y += Math.sin(ball.angle) * speed * dt;
     updateCircle(ball.$ball, ball.x, ball.y);
+
+    if (ball.x > gameSize || ball.x < 0 ||
+        ball.y > gameSize || ball.y < 0) {
+            alert(`Game over - you ${didLose ? 'lost :(' : 'won!'}`);
+            ws.send(JSON.stringify({
+                type: shared.MSG_TYPE.END,
+            }));
+            endGame();
+    }
 }
 
 
 function startAnimating() {
     let lastUpdate = Date.now();
-    setInterval(() => {
+    gameInterval = setInterval(() => {
         const time = Date.now();
 
         const timeDelta = (time - lastUpdate) / 1000;
@@ -179,17 +232,38 @@ function detectCollisions() {
     const minDist = ballSize * 1.25;
     lastBounce = lastBounce || Date.now();
 
+    // Prevent multiple bounces per collision by adding a delay
     if (Date.now() - lastBounce < 100) return false;
 
-    for (let i = 0; i < walls.length; i++) {
-        const wall = walls[i];
-        const doesCollide = distToLine(wall[0], wall[1], ball) < minDist;
+    const transformCoords = ($line) => [
+        {x: $line.attr('x1'), y: $line.attr('y1')},
+        {x: $line.attr('x2'), y: $line.attr('y2')},
+    ];
+
+    for (let i = 0; i < $walls.length; i++) {
+        const $wall = $walls[i];
+        const doesCollide = distToLine(...transformCoords($wall), ball) < minDist;
         if (doesCollide) {
-            lastBounce = Date.now();
-            const wallAngle = wall[2];
-            return (Math.PI + 2 * wallAngle - ball.angle) % (Math.PI * 2);
+            const playerId = $wall.attr('data-player-id');
+            const _bounce = () => {
+                lastBounce = Date.now();
+                const wallAngle = $wall.attr('data-angle');
+                return (Math.PI + 2 * wallAngle - ball.angle) % (Math.PI * 2);
+            }
+            if (!playerId) {
+                return _bounce();
+            } else {
+                const $paddle = $paddles.find(($paddle) => $paddle.attr('data-player-id') === playerId);
+                const hitsPaddle = distToLine(...transformCoords($paddle), ball) < minDist;
+                if (hitsPaddle) {
+                    return _bounce();
+                }
+                didLose = playerId === uuid;
+                return false;
+            }
         }
     }
+
     return false;
 }
 
@@ -202,6 +276,9 @@ function drawLine({ x: x1, y: y1 }, { x: x2, y: y2 }) {
     return $(createSvg('line'))
         .attr({ x1, y1, x2, y2 })
         .appendTo($game);
+}
+function updateLine($line, { x: x1, y: y1 }, { x: x2, y: y2 }) {
+    $line.attr({ x1, y1, x2, y2 });
 }
 
 function drawCircle(cx, cy, r) {
@@ -217,16 +294,24 @@ function updateCircle($circle, cx, cy) {
 
 function projectAngle(start, dist, angle) {
     return {
-        x: start.x + Math.cos(angle) * dist,
-        y: start.y + Math.sin(angle) * dist
+        x: _.round(start.x + Math.cos(angle) * dist, 2),
+        y: _.round(start.y + Math.sin(angle) * dist, 2)
     }
 }
 
 function projectSlope(start, dist, slope) {
+    if (slope === false) {
+        // Handle vertical slope
+        return {
+            x: start.x,
+            y: start.y + dist
+        };
+    }
+
     const deltaX = Math.sqrt(Math.pow(dist, 2) / (Math.pow(slope, 2) + 1)) * (dist > 0 ? 1 : -1);
     return {
-        x: start.x + deltaX,
-        y: start.y + deltaX * slope
+        x: _.round(start.x + deltaX, 2),
+        y: _.round(start.y + deltaX * slope, 2)
     }
 }
 
@@ -236,8 +321,8 @@ function interpolatePoint($line, percent) {
     const deltaY = endPt.y - startPt.y;
     const deltaX = endPt.x - startPt.x;
     return {
-        x: startPt.x + deltaX * percent,
-        y: startPt.y + deltaY * percent
+        x: _.round(startPt.x + deltaX * percent, 2),
+        y: _.round(startPt.y + deltaY * percent, 2)
     }
 }
 
@@ -265,14 +350,21 @@ function getDist(p1, p2) {
     return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 }
 function distToLine(l1, l2, p) {
-    const m1 = (l2.y - l1.y) / (l2.x - l1.x);
-    const b1 = l1.y - l1.x * m1;
+    let cX, cY;
+    if (l2.x === l1.x) {
+         // Handle vertical lines
+        cX = l1.x;
+        cY = p.y;
+    } else {
+        const m1 = (l2.y - l1.y) / (l2.x - l1.x);
+        const b1 = l1.y - l1.x * m1;
 
-    const m2 = -1 / m1;
-    const b2 = p.y - p.x * m2;
+        const m2 = -1 / m1;
+        const b2 = p.y - p.x * m2;
 
-    const cX = (b2 - b1) / (m1 - m2);
-    const cY = m1 * cX + b1;
+        cX = (b2 - b1) / (m1 - m2);
+        cY = m1 * cX + b1;
+    }
 
     let closest = { x: cX, y: cY };
     if (getDist(l1, closest) > getDist(l1, l2)) closest = l2;
