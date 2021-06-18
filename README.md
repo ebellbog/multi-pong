@@ -1,4 +1,4 @@
-# multi-pong
+# Party Pong
 Multiplayer pong game jam
 
 **To run front end:**
@@ -8,6 +8,6 @@ Multiplayer pong game jam
 * Site will automatically update when code changes
 
 **To run back end:**
-* `yarn nodemon src/serve.js`
+* `yarn serve`
 * Server will automatically restart when code changes
 
