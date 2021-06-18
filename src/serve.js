@@ -16,14 +16,20 @@ const gameState = {
     isStarted: false,
 };
 
-const paddleSpeed = .05;
+const paddleSpeed = .02;
 
 const notifyPlayers = () => {
     sendToAllClients(JSON.stringify({
         type: shared.MSG_TYPE.JOINED,
-        players: Object.keys(gameState.players)
+        players: getPlayersAndPositions(),
     }));
 }
+
+const getPlayersAndPositions = () =>
+    Object.entries(gameState.players).reduce((acc, [playerId, playerData]) => {
+        acc[playerId] = playerData.paddlePosition;
+        return acc;
+    }, {});
 
 server.on('connection', function (socket) {
     socket.on('message', (msg) => {
@@ -53,10 +59,12 @@ server.on('connection', function (socket) {
 
         if (msg.type === shared.MSG_TYPE.MOVE) {
             const { playerId, direction } = msg;
-            gameState.players[playerId].paddlePosition += direction * paddleSpeed;
+            const playerData = gameState.players[playerId];
+            playerData.paddlePosition = Math.min(Math.max(playerData.paddlePosition + direction * paddleSpeed, .15), .85);
+
             sendToAllClients(JSON.stringify({
                 type: shared.MSG_TYPE.PADDLEPOSITIONS,
-                paddlePositions: gameState.players,//Object.keys(gameState.players).reduce((acc, key) => acc[key] = _.pick(gameState.players[key], ['paddlePosition']), {})
+                paddlePositions: getPlayersAndPositions()
             }));
         }
     });
@@ -78,12 +86,9 @@ server.on('connection', function (socket) {
             notifyPlayers();
         }
     });
-
-    // startGame();
 });
 
 const sendToAllClients = (msg) => {
-    console.log(gameState);
     for (const playerId in gameState.players) {
         console.log(`sending msg "${msg}" to player with id ${playerId}`);
         gameState.players[playerId].socket.send(msg);

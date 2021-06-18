@@ -14,8 +14,9 @@ const ballSize = 8;
 
 const speed = 200;
 
-const $paddles = [], walls = [];
-let paddleLength, paddlePlacement;
+const walls = [];
+let $paddles = [];
+let paddleLength;
 
 let ball;
 let lastBounce;
@@ -25,6 +26,7 @@ let gameInterval = null;
 
 $(document).ready(() => {
     ws = new WebSocket('ws://localhost:9001');
+    $game.attr('viewBox', `0 0 ${gameSize} ${gameSize}`);
 
     $(document).on('keydown', ({ which }) => {
         switch (which) {
@@ -32,14 +34,14 @@ $(document).ready(() => {
                 ws.send(JSON.stringify({
                     type: shared.MSG_TYPE.MOVE,
                     playerId: uuid,
-                    direction: -1, // -1 = left, 1 = right
+                    direction: 1, // 1 = left, -1 = right
                 }));
                 break;
             case 39:
                 ws.send(JSON.stringify({
                     type: shared.MSG_TYPE.MOVE,
                     playerId: uuid,
-                    direction: 1, // -1 = left, 1 = right
+                    direction: -1, // 1 = left, -1 = right
                 }));
                 break;
             default:
@@ -72,12 +74,12 @@ $(document).ready(() => {
             $('line').remove();
             paddleLength = null;
 
-            const playerIdx = msg.players.indexOf(uuid);
-            setupWalls(msg.players, playerIdx);
-            setupPaddles(msg.players, playerIdx);
+            const {players} = msg;
+            setupWalls(players);
+            setupPaddles(players);
         }
         if (msg.type === shared.MSG_TYPE.PADDLEPOSITIONS) {
-            console.log(msg.paddlePositions);
+            updatePaddles(msg.paddlePositions);
         }
     };
 });
@@ -105,11 +107,13 @@ function endGame() {
 // Setup methods
 
 function setupWalls(players) {
-    $game.attr('viewBox', `0 0 ${gameSize} ${gameSize}`);
+    players = Object.keys(players);
+
     const radius = gameSize / 2 - padding;
     const centerPt = { x: gameSize / 2, y: gameSize / 2 };
     const numWalls = Math.max(players.length, 3);
     const angleDelta = (Math.PI * 2) / numWalls;
+
     for (let i = 0; i < numWalls; i++) {
         const startAngle = angleDelta * i;
         const endAngle = angleDelta * (i + 1);
@@ -121,7 +125,7 @@ function setupWalls(players) {
             .addClass('wall')
             .attr({
                 stroke: `hsl(${360 * i / numWalls} , 100%, 50%)`,
-                'data-player-id': (i < players.length - 1) ? players[i] : ''
+                'data-player-id': (i < players.length) ? players[i] : ''
             });
 
         const wallAngle = (startAngle + endAngle) / 2;
@@ -129,23 +133,32 @@ function setupWalls(players) {
     }
 }
 
-function setupPaddles(players, playerIdx) {
-    paddlePlacement = 0.5;
-    $('line').each((idx, line) => {
-        if (idx >= players.length) return;
+function setupPaddles(players) {
+    $paddles = [];
+    $('.wall').each((idx, line) => {
         const $line = $(line);
-        const center = getCenter($line);
+
+        // Only add paddles to walls associated with actual players
+        const playerId = $line.attr('data-player-id');
+        if (!playerId) {
+            return;
+        }
+
+        const paddlePosition = players[playerId];
+        const center = interpolatePoint($line, paddlePosition);
         const slope = getSlope($line);
         if (!paddleLength) {
             paddleLength = getLength($line) * 0.3;
         }
+
         const startPt = projectSlope(center, -paddleLength / 2, slope);
         const endPt = projectSlope(center, paddleLength / 2, slope);
+
         const $paddle = drawLine(startPt, endPt)
-            .addClass(`paddle${idx === playerIdx ? ' active-player' : ''}`)
+            .addClass(`paddle${playerId === uuid ? ' active-player' : ''}`)
             .attr({
                 stroke: $line.attr('stroke'),
-                'data-player-id': $line.attr('data-player-id')
+                'data-player-id': playerId,
             });
         $paddles.push($paddle);
     });
@@ -163,9 +176,19 @@ function setupBall(angle) {
 
 // Animation methods
 
-function updatePaddles() {
+function updatePaddles(paddlePositions) {
     $paddles.forEach(($paddle) => {
+        const playerId = $paddle.attr('data-player-id');
+        const position = paddlePositions[playerId];
 
+        const $wall = $(`.wall[data-player-id="${playerId}"]`);
+        const slope = getSlope($wall);
+
+        const newCenter = interpolatePoint($wall, position);
+        const startPt = projectSlope(newCenter, -paddleLength / 2, slope);
+        const endPt = projectSlope(newCenter, paddleLength / 2, slope);
+
+        updateLine($paddle, startPt, endPt);
     })
 }
 
@@ -222,6 +245,9 @@ function drawLine({ x: x1, y: y1 }, { x: x2, y: y2 }) {
     return $(createSvg('line'))
         .attr({ x1, y1, x2, y2 })
         .appendTo($game);
+}
+function updateLine($line, { x: x1, y: y1 }, { x: x2, y: y2 }) {
+    $line.attr({ x1, y1, x2, y2 });
 }
 
 function drawCircle(cx, cy, r) {
