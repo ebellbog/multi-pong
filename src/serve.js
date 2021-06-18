@@ -3,7 +3,7 @@ const shared = require('./shared.js');
 const _ = require('lodash');
 
 const server = new WebSocket.Server({
-  port: 9001,
+    port: 9001,
 });
 
 const gameState = {
@@ -25,7 +25,7 @@ const notifyPlayers = () => {
     }));
 }
 
-server.on('connection', function(socket) {
+server.on('connection', function (socket) {
     socket.on('message', (msg) => {
         msg = JSON.parse(msg);
 
@@ -44,17 +44,7 @@ server.on('connection', function(socket) {
         if (msg.type === shared.MSG_TYPE.START) {
             gameState.isStarted = true;
             sendToAllClients(JSON.stringify({
-                type:shared.MSG_TYPE.STARTED,
-                ball: {
-                    angle: Math.random() * Math.PI * 2,
-                },
-            }));
-        }
-
-        if (msg.type === shared.MSG_TYPE.START) {
-            gameState.isStarted = true;
-            sendToAllClients(JSON.stringify({
-                type:shared.MSG_TYPE.STARTED,
+                type: shared.MSG_TYPE.STARTED,
                 ball: {
                     angle: Math.random() * Math.PI * 2,
                 },
@@ -62,10 +52,10 @@ server.on('connection', function(socket) {
         }
 
         if (msg.type === shared.MSG_TYPE.MOVE) {
-            const {playerId, direction} = msg;
+            const { playerId, direction } = msg;
             gameState.players[playerId].paddlePosition += direction * paddleSpeed;
             sendToAllClients(JSON.stringify({
-                type:shared.MSG_TYPE.PADDLEPOSITIONS,
+                type: shared.MSG_TYPE.PADDLEPOSITIONS,
                 paddlePositions: gameState.players,//Object.keys(gameState.players).reduce((acc, key) => acc[key] = _.pick(gameState.players[key], ['paddlePosition']), {})
             }));
         }

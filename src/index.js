@@ -4,6 +4,7 @@ const shared = require('./shared');
 
 let ws;
 
+const $newGameContainer = $('#new-game-container');
 const $newGame = $('#btn-new-game');
 const $game = $('#game');
 const gameSize = 500;
@@ -45,8 +46,10 @@ $(document).ready(() => {
     })
 
     ws.onopen = () => {
+        // Create an ID for the player
         uuid = `${Math.floor(Math.random() * 10000000000000001)}`;
 
+        // Send a join message and playerId back to the server
         ws.send(JSON.stringify({
             type: shared.MSG_TYPE.JOIN,
             playerId: uuid,
@@ -59,7 +62,7 @@ $(document).ready(() => {
             const angle = +msg.ball.angle;
             setupBall(angle);
             startAnimating();
-            $newGame.hide();
+            $newGameContainer.hide();
         }
         if (msg.type === shared.MSG_TYPE.JOINED) {
             $('line').remove();
