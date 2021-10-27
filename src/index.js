@@ -16,6 +16,7 @@ const speed = 175;
 
 let $walls = [], $paddles = [];
 let paddleLength;
+const keyRepeatTimeMs = 50;
 
 let ball;
 let lastBounce;
@@ -28,26 +29,39 @@ $(document).ready(() => {
     ws = new WebSocket('ws://localhost:9001');
     $game.attr('viewBox', `0 0 ${gameSize} ${gameSize}`);
 
-    $(document).on('keydown', ({ which }) => {
-        switch (which) {
-            case 37:
-                ws.send(JSON.stringify({
-                    type: shared.MSG_TYPE.MOVE,
-                    playerId: uuid,
-                    direction: 1, // 1 = left, -1 = right
-                }));
-                break;
-            case 39:
-                ws.send(JSON.stringify({
-                    type: shared.MSG_TYPE.MOVE,
-                    playerId: uuid,
-                    direction: -1, // 1 = left, -1 = right
-                }));
-                break;
-            default:
-                break;
+    const move = (direction) => {
+        ws.send(JSON.stringify({
+            type: shared.MSG_TYPE.MOVE,
+            playerId: uuid,
+            direction: direction,
+        }));
+    };
+
+    let repeatIntervalId = null;
+    let whichDown = null;
+    $(document).on('keydown', ({originalEvent: {repeat}, which}) => {
+        // Ignore new events from the user holding the key down; the timer will take care of that.
+        if (repeat) {
+            return;
         }
-    })
+
+        // When down, start an interval repeat
+        whichDown = which;
+        const direction = which === 37 ? 1 : which === 39 ? -1 : 0; // 1 = left, -1 = right
+        if (direction) {
+            move(direction);
+            clearInterval(repeatIntervalId);
+            repeatIntervalId = setInterval(() => {
+                move(direction);
+            }, keyRepeatTimeMs);
+        }
+    }).on('keyup', ({which}) => {
+        // When the key comes back up, kill the interval
+        if (which === whichDown) {
+            clearInterval(repeatIntervalId);
+        }
+    });
+
 
     ws.onopen = () => {
         // Create an ID for the player
